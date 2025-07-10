@@ -1,0 +1,1785 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ayang HTML: 웹사이트 빌더</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=Open+Sans&family=Roboto&display=swap" rel="stylesheet">
+    <style>
+        /* 기본 스타일 초기화 및 폰트 설정 */
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            margin: 0;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+            background-color: #f0f2f5;
+            color: #333; /* 편집기 기본 텍스트 색상 */
+        }
+
+        /* 사이드바 스타일 */
+        #sidebar {
+            width: 280px;
+            background-color: #ffffff;
+            padding: 25px 20px;
+            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.05);
+            overflow-y: auto;
+            flex-shrink: 0;
+            border-right: 1px solid #eee;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #sidebar h2 {
+            color: #4a90e2;
+            margin-top: 0;
+            font-size: 1.8em;
+            text-align: center;
+            margin-bottom: 30px;
+            font-weight: 700;
+        }
+
+        .category-title {
+            font-size: 1.1em;
+            font-weight: 700;
+            color: #555;
+            margin-top: 25px;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 5px;
+        }
+
+        .draggable-item {
+            background-color: #e3f2fd;
+            border: 1px solid #90caf9;
+            padding: 12px 15px;
+            margin-bottom: 10px;
+            cursor: grab;
+            border-radius: 8px;
+            font-size: 0.95em;
+            color: #1565c0;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            text-align: center;
+            user-select: none;
+        }
+
+        .draggable-item:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            background-color: #bbdefb;
+        }
+
+        .draggable-item:active {
+            cursor: grabbing;
+            transform: translateY(0);
+            box-shadow: none;
+        }
+
+        /* 메인 작업 영역 (캔버스) 스타일 */
+        #main-content {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            background-color: #f8f9fa;
+        }
+
+        #toolbar {
+            background-color: #ffffff;
+            padding: 10px 20px;
+            border-bottom: 1px solid #eee;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.03);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        #toolbar .toolbar-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        #toolbar button {
+            background-color: #4a90e2;
+            color: white;
+            padding: 8px 15px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: background-color 0.2s ease, opacity 0.2s ease;
+        }
+
+        #toolbar button:hover:not(:disabled) {
+            background-color: #357ABD;
+        }
+
+        #toolbar button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        #toolbar button#clear-canvas-btn {
+            background-color: #ff5252;
+        }
+        #toolbar button#clear-canvas-btn:hover:not(:disabled) {
+            background-color: #e04040;
+        }
+
+        #toolbar button#play-btn {
+            background-color: #4CAF50;
+        }
+        #toolbar button#play-btn:hover:not(:disabled) {
+            background-color: #43A047;
+        }
+
+        #drop-zone {
+            flex-grow: 1;
+            background-color: #ffffff;
+            border: 2px dashed #cfd8dc;
+            margin: 20px;
+            border-radius: 12px;
+            position: relative;
+            overflow: hidden;
+            transition: border-color 0.3s ease, background-color 0.3s ease;
+            user-select: none;
+        }
+
+        #drop-zone.drag-over {
+            background-color: #e8f5e9;
+            border-color: #81c784;
+        }
+
+        #drop-zone p.placeholder-message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 1.3em;
+            color: #90a4ae;
+            text-align: center;
+            pointer-events: none;
+        }
+
+        /* 드롭된 요소 컨테이너 스타일 (투명한 박스) */
+        .dropped-element-container {
+            position: absolute;
+            cursor: grab;
+            box-sizing: border-box;
+            min-width: 20px;
+            min-height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1;
+        }
+
+        /* 선택된 요소 컨테이너 스타일 (점선 테두리) */
+        .dropped-element-container.selected {
+            border: 1px dashed #4a90e2;
+            outline: 1px solid #4a90e2;
+            outline-offset: 2px;
+            z-index: 100;
+        }
+
+        /* 크기 조절 핸들 */
+        .resize-handle {
+            width: 10px;
+            height: 10px;
+            background-color: #4a90e2;
+            border: 1px solid #ffffff;
+            position: absolute;
+            cursor: nwse-resize;
+            border-radius: 2px;
+            z-index: 101;
+            display: none;
+        }
+        .resize-handle.top-left { top: -5px; left: -5px; cursor: nwse-resize; }
+        .resize-handle.top-right { top: -5px; right: -5px; cursor: nesw-resize; }
+        .resize-handle.bottom-left { bottom: -5px; left: -5px; cursor: nesw-resize; }
+        .resize-handle.bottom-right { bottom: -5px; right: -5px; cursor: nwse-resize; }
+
+        /* 내부 실제 요소 스타일 */
+        .dropped-content {
+            outline: none;
+            word-break: break-word;
+            user-select: text;
+            -webkit-user-select: text;
+            -moz-user-select: text;
+            -ms-user-select: text;
+            max-width: 100%;
+            max-height: 100%;
+            overflow: hidden;
+            box-sizing: border-box;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* 텍스트 요소들 */
+        .dropped-content.text-element {
+            padding: 5px;
+            text-align: center;
+        }
+        .dropped-content.text-element h1,
+        .dropped-content.text-element p,
+        .dropped-content.text-element ul {
+            margin: 0;
+            padding: 0;
+            line-height: 1.2;
+        }
+        .dropped-content.text-element h1 { font-size: 2.5em; }
+        .dropped-content.text-element p { font-size: 1em; }
+        .dropped-content.text-element ul { list-style: disc; padding-left: 20px; text-align: left;}
+        .dropped-content.text-element li { font-size: 1em; }
+
+        .dropped-content.image-element img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            display: block;
+            border-radius: 5px;
+        }
+
+        .dropped-content.button-element button {
+            background-color: #4caf50;
+            color: white;
+            padding: 8px 15px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: background-color 0.2s ease;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .dropped-content.button-element button:hover {
+            background-color: #43a047;
+        }
+
+        .dropped-content.input-element input[type="text"],
+        .dropped-content.textarea-element textarea {
+            width: 100%;
+            height: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 0.9em;
+            box-sizing: border-box;
+        }
+
+        .dropped-content.section-element {
+            width: 100%;
+            height: 100%;
+            background-color: #f0f4f7;
+            border: 1px dashed #c0d0e0;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9em;
+            color: #aaa;
+        }
+        .dropped-content.divider-element hr {
+            width: 100%;
+            border: none;
+            border-top: 2px solid #ccc;
+            margin: 0;
+        }
+        .dropped-content.video-element .video-placeholder {
+            background-color: #263238;
+            color: #eceff1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+            font-size: 0.9em;
+            border-radius: 5px;
+        }
+        .dropped-content.video-element video,
+        .dropped-content.video-element iframe {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 5px;
+        }
+        .dropped-content.icon-element .icon-placeholder {
+            font-size: 3em;
+            text-align: center;
+            color: #ffc107;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* 공통 패널 스타일 */
+        .floating-panel {
+            position: absolute;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            padding: 15px;
+            z-index: 200;
+            display: none; /* 기본적으로 숨김 */
+            flex-direction: column;
+            resize: both;
+            overflow: hidden;
+            min-width: 150px;
+            min-height: 100px;
+        }
+
+        .floating-panel .panel-header {
+            cursor: grab;
+            padding-bottom: 10px;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .floating-panel .panel-header h3 {
+            margin: 0;
+            color: #4a90e2;
+            font-size: 1.1em;
+        }
+        .floating-panel .panel-header .close-btn {
+            background: none;
+            border: none;
+            font-size: 1.2em;
+            cursor: pointer;
+            color: #888;
+        }
+        .floating-panel .panel-header .close-btn:hover {
+            color: #333;
+        }
+        .floating-panel .panel-content {
+            flex-grow: 1;
+            overflow-y: auto;
+        }
+
+        /* Hirichey Panel */
+        #hirichey-panel {
+            top: 80px;
+            right: 20px;
+            width: 200px;
+            height: 300px;
+        }
+        #hirichey-list {
+            border: 1px solid #eee;
+            border-radius: 5px;
+        }
+        .hirichey-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 10px;
+            border-bottom: 1px solid #f5f5f5;
+            font-size: 0.9em;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+        .hirichey-item:last-child {
+            border-bottom: none;
+        }
+        .hirichey-item:hover {
+            background-color: #eef;
+        }
+        .hirichey-item.selected {
+            background-color: #e3f2fd;
+            font-weight: 700;
+            color: #1565c0;
+        }
+        .hirichey-item span {
+            flex-grow: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .hirichey-item .z-index-display {
+            font-size: 0.8em;
+            color: #888;
+            margin-left: 10px;
+        }
+        .hirichey-item .visibility-toggle {
+            margin-left: 5px;
+            cursor: pointer;
+            font-size: 1.1em;
+            color: #666;
+        }
+        .hirichey-item .visibility-toggle.hidden {
+            color: #ccc;
+        }
+
+        /* Inspector Panel */
+        #inspector-panel {
+            top: 80px;
+            right: 240px;
+            width: 250px;
+            height: 300px;
+        }
+        #inspector-panel .control-group {
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px dashed #eee;
+        }
+        #inspector-panel .control-group:last-child {
+            border-bottom: none;
+        }
+        #inspector-panel label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 700;
+            font-size: 0.9em;
+            color: #555;
+        }
+        #inspector-panel select,
+        #inspector-panel input[type="text"],
+        #inspector-panel input[type="number"],
+        #inspector-panel input[type="file"] {
+            width: calc(100% - 10px);
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 0.85em;
+            box-sizing: border-box;
+            margin-bottom: 5px;
+        }
+        #inspector-panel button {
+            background-color: #4a90e2;
+            color: white;
+            padding: 6px 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8em;
+            margin-top: 5px;
+        }
+        #inspector-panel button:hover {
+            background-color: #357ABD;
+        }
+        #inspector-panel .z-index-controls {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        #inspector-panel .z-index-controls button {
+            padding: 5px 8px;
+            font-size: 0.8em;
+        }
+
+        /* 버튼 동작 설정 모달 */
+        #button-action-modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4);
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background-color: #fefefe;
+            margin: auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 300px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+
+        .modal-content h3 {
+            margin-top: 0;
+            color: #4a90e2;
+        }
+
+        .modal-content label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 700;
+        }
+
+        .modal-content select, .modal-content input[type="text"] {
+            width: calc(100% - 22px);
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 0.9em;
+        }
+
+        .modal-buttons {
+            text-align: right;
+        }
+
+        .modal-buttons button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 8px 15px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+
+        .modal-buttons button:hover {
+            background-color: #43a047;
+        }
+        .modal-buttons button.cancel {
+            background-color: #9e9e9e;
+        }
+        .modal-buttons button.cancel:hover {
+            background-color: #757575;
+        }
+
+    </style>
+</head>
+<body>
+    <div id="sidebar">
+        <h2>Ayang HTML ✨</h2>
+        <div class="category-title">텍스트 블록</div>
+        <div class="draggable-item" draggable="true" data-type="title">제목</div>
+        <div class="draggable-item" draggable="true" data-type="paragraph">문단</div>
+        <div class="draggable-item" draggable="true" data-type="list">목록</div>
+
+        <div class="category-title">미디어 블록</div>
+        <div class="draggable-item" draggable="true" data-type="image">이미지</div>
+        <div class="draggable-item" draggable="true" data-type="video">비디오</div>
+        <div class="draggable-item" draggable="true" data-type="icon">아이콘</div>
+
+        <div class="category-title">버튼 & 입력</div>
+        <div class="draggable-item" draggable="true" data-type="button">버튼</div>
+        <div class="draggable-item" draggable="true" data-type="input">텍스트 입력</div>
+        <div class="draggable-item" draggable="true" data-type="textarea">여러 줄 입력</div>
+
+        <div class="category-title">레이아웃</div>
+        <div class="draggable-item" draggable="true" data-type="section">섹션/컨테이너</div>
+        <div class="draggable-item" draggable="true" data-type="divider">구분선</div>
+    </div>
+
+    <div id="main-content">
+        <div id="toolbar">
+            <div class="toolbar-group">
+                <button id="play-btn">▶️ Play</button>
+                <button id="change-title-btn">웹사이트 제목 변경</button>
+            </div>
+            <div class="toolbar-group">
+                <button id="clear-canvas-btn">모두 지우기</button>
+                <button id="copy-code-btn">코드 복사하기</button>
+            </div>
+        </div>
+        <div id="drop-zone">
+            <p class="placeholder-message">여기에 요소를 드래그 앤 드롭해서 웹페이지를 만들어 보세요!</p>
+        </div>
+    </div>
+
+    <!-- Hirichey Panel -->
+    <div id="hirichey-panel" class="floating-panel">
+        <div class="panel-header">
+            <h3>Hirichey</h3>
+            <button class="close-btn" data-target="hirichey-panel">✖️</button>
+        </div>
+        <div class="panel-content">
+            <div id="hirichey-list">
+                <!-- 레이어 아이템들이 여기에 동적으로 추가됩니다 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Inspector Panel -->
+    <div id="inspector-panel" class="floating-panel">
+        <div class="panel-header">
+            <h3>Inspector</h3>
+            <button class="close-btn" data-target="inspector-panel">✖️</button>
+        </div>
+        <div class="panel-content">
+            <div id="no-selection-message" style="text-align: center; color: #888; padding-top: 20px;">
+                요소를 선택하면 속성이 나타납니다.
+            </div>
+
+            <div id="text-controls" class="control-group" style="display: none;">
+                <label for="font-size-select">글씨 크기:</label>
+                <select id="font-size-select">
+                    <option value="">기본</option>
+                    <option value="12px">12px</option>
+                    <option value="14px">14px</option>
+                    <option value="16px">16px</option>
+                    <option value="18px">18px</option>
+                    <option value="20px">20px</option>
+                    <option value="24px">24px</option>
+                    <option value="30px">30px</option>
+                    <option value="36px">36px</option>
+                    <option value="48px">48px</option>
+                    <option value="60px">60px</option>
+                </select>
+                <label for="font-family-select">폰트:</label>
+                <select id="font-family-select">
+                    <option value="">기본</option>
+                    <option value="'Noto Sans KR', sans-serif">Noto Sans KR</option>
+                    <option value="'Open Sans', sans-serif">Open Sans</option>
+                    <option value="'Roboto', sans-serif">Roboto</option>
+                    <option value="serif">Serif</option>
+                    <option value="monospace">Monospace</option>
+                </select>
+            </div>
+
+            <div id="layer-controls" class="control-group" style="display: none;">
+                <label>레이어 (Z-index):</label>
+                <div class="z-index-controls">
+                    <input type="number" id="z-index-input" min="1" value="1" style="width: 60px;">
+                    <button id="z-index-up">▲</button>
+                    <button id="z-index-down">▼</button>
+                </div>
+            </div>
+
+            <div id="media-controls" class="control-group" style="display: none;">
+                <label id="media-label"></label>
+                <input type="file" id="media-file-input" accept="image/*,video/*" style="display: none;">
+                <input type="text" id="media-url-input" placeholder="URL 또는 임베드 코드" style="display: none;">
+                <button id="media-replace-btn" style="width: 100%;">미디어 교체</button>
+            </div>
+            
+            <div id="button-action-controls" class="control-group" style="display: none;">
+                <label>버튼 동작 설정:</label>
+                <button id="open-button-action-modal-btn" style="width: 100%;">동작 설정</button>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- 버튼 동작 설정 모달 -->
+    <div id="button-action-modal">
+        <div class="modal-content">
+            <h3>버튼 동작 설정</h3>
+            <label for="action-type">동작 유형:</label>
+            <select id="action-type">
+                <option value="none">동작 없음</option>
+                <option value="link">링크 이동</option>
+                <!-- <option value="layer">다른 레이어로 이동 (미구현)</option> -->
+            </select>
+
+            <div id="link-input-group">
+                <label for="link-url">링크 URL:</label>
+                <input type="text" id="link-url" placeholder="https://example.com">
+            </div>
+
+            <div class="modal-buttons">
+                <button class="cancel" id="action-cancel-btn">취소</button>
+                <button id="action-save-btn">저장</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const dropZone = document.getElementById('drop-zone');
+        const clearCanvasBtn = document.getElementById('clear-canvas-btn');
+        const playBtn = document.getElementById('play-btn');
+        const copyCodeBtn = document.getElementById('copy-code-btn');
+        const changeTitleBtn = document.getElementById('change-title-btn');
+
+        // Panels
+        const hiricheyPanel = document.getElementById('hirichey-panel');
+        const hiricheyList = document.getElementById('hirichey-list');
+        const inspectorPanel = document.getElementById('inspector-panel');
+        const noSelectionMessage = document.getElementById('no-selection-message');
+        const textControls = document.getElementById('text-controls');
+        const layerControls = document.getElementById('layer-controls');
+        const mediaControls = document.getElementById('media-controls');
+        const buttonActionControls = document.getElementById('button-action-controls');
+
+        // Inspector Controls
+        const fontSizeSelect = document.getElementById('font-size-select');
+        const fontFamilySelect = document.getElementById('font-family-select');
+        const zIndexInput = document.getElementById('z-index-input');
+        const zIndexUpBtn = document.getElementById('z-index-up');
+        const zIndexDownBtn = document.getElementById('z-index-down');
+        const mediaLabel = document.getElementById('media-label');
+        const mediaFileInput = document.getElementById('media-file-input');
+        const mediaUrlInput = document.getElementById('media-url-input');
+        const mediaReplaceBtn = document.getElementById('media-replace-btn');
+        const openButtonActionModalBtn = document.getElementById('open-button-action-modal-btn');
+
+        // Button Action Modal
+        const buttonActionModal = document.getElementById('button-action-modal');
+        const actionTypeSelect = document.getElementById('action-type');
+        const linkInputGroup = document.getElementById('link-input-group');
+        const linkUrlInput = document.getElementById('link-url');
+        const actionSaveBtn = document.getElementById('action-save-btn');
+        const actionCancelBtn = document.getElementById('action-cancel-btn');
+
+        let selectedElementContainer = null;
+        let isDraggingElement = false;
+        let isResizingElement = false;
+        let resizeHandleType = '';
+        let initialMouseX, initialMouseY;
+        let initialWidth, initialHeight;
+        let initialLeft, initialTop;
+        let offsetX, offsetY;
+        let maxZIndex = 1;
+        let currentWebsiteTitle = document.title;
+
+        // Panel Dragging & Resizing State
+        let isDraggingPanel = false;
+        let isResizingPanel = false;
+        let currentPanel = null;
+        let panelOffsetX, panelOffsetY; // Offset for panel dragging
+        let panelResizeHandleType = '';
+        let panelInitialMouseX, panelInitialMouseY, panelInitialWidth, panelInitialHeight, panelInitialLeft, panelInitialTop;
+
+        // History for Undo/Redo
+        const history = [];
+        let historyIndex = -1;
+        const MAX_HISTORY_STATES = 20;
+
+        // Button Action Modal specific variable (declared once globally)
+        let currentButtonElementInModal = null; 
+
+        // --- History Management ---
+        function saveState() {
+            // Ensure contenteditable elements are not active when saving
+            document.querySelectorAll('[contenteditable="true"]').forEach(el => el.blur());
+
+            if (historyIndex < history.length - 1) {
+                history.splice(historyIndex + 1);
+            }
+            // Save current HTML content of dropZone and currentWebsiteTitle
+            history.push({
+                html: dropZone.innerHTML,
+                title: currentWebsiteTitle,
+                maxZ: maxZIndex
+            });
+            if (history.length > MAX_HISTORY_STATES) {
+                history.shift();
+            }
+            historyIndex = history.length - 1;
+        }
+
+        function loadState(index) {
+            if (index >= 0 && index < history.length) {
+                const state = history[index];
+                dropZone.innerHTML = state.html;
+                currentWebsiteTitle = state.title;
+                document.title = currentWebsiteTitle; // Update editor title
+                maxZIndex = state.maxZ;
+
+                historyIndex = index;
+                
+                // Re-attach event listeners to all elements
+                dropZone.querySelectorAll('.dropped-element-container').forEach(addEventListenersToDroppedElement);
+                
+                // Deselect any previously selected element
+                if (selectedElementContainer) {
+                    selectedElementContainer.classList.remove('selected');
+                    selectedElementContainer.querySelectorAll('.resize-handle').forEach(handle => handle.style.display = 'none');
+                }
+                selectedElementContainer = null; // Clear selection
+                
+                updateHiricheyPanel();
+                updateInspectorPanel(); // Also updates text styling controls
+
+                // Restore placeholder message if canvas is empty
+                if (dropZone.children.length === 0) {
+                    const p = document.createElement('p');
+                    p.classList.add('placeholder-message');
+                    p.textContent = '여기에 요소를 드래그 앤 드롭해서 웹페이지를 만들어 보세요!';
+                    dropZone.appendChild(p);
+                }
+            }
+        }
+
+        // --- Element Dragging & Resizing ---
+        document.querySelectorAll('.draggable-item').forEach(item => {
+            item.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text/plain', e.target.dataset.type);
+                e.dataTransfer.effectAllowed = 'copy';
+            });
+        });
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('drag-over');
+            e.dataTransfer.dropEffect = 'copy';
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('drag-over');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-over');
+
+            saveState(); // Save state before adding new element
+
+            const dataType = e.dataTransfer.getData('text/plain');
+            const newElementContainer = document.createElement('div');
+            newElementContainer.classList.add('dropped-element-container');
+            newElementContainer.dataset.type = dataType;
+            newElementContainer.style.zIndex = ++maxZIndex;
+
+            const droppedContent = document.createElement('div');
+            droppedContent.classList.add('dropped-content');
+            droppedContent.classList.add(`${dataType}-element`);
+            
+            // Initial content and size based on type
+            switch (dataType) {
+                case 'title':
+                    droppedContent.innerHTML = `<h1 contenteditable="true">새로운 제목</h1>`;
+                    newElementContainer.style.width = '300px';
+                    newElementContainer.style.height = '80px';
+                    break;
+                case 'paragraph':
+                    droppedContent.innerHTML = `<p contenteditable="true">여기에 내용을 입력하세요. 자유롭게 글을 작성할 수 있습니다.</p>`;
+                    newElementContainer.style.width = '400px';
+                    newElementContainer.style.height = '100px';
+                    break;
+                case 'image':
+                    droppedContent.innerHTML = `<img src="https://via.placeholder.com/300x200?text=이미지를 넣으세요" alt="Placeholder Image">`;
+                    newElementContainer.style.width = '320px';
+                    newElementContainer.style.height = '250px';
+                    break;
+                case 'button':
+                    droppedContent.innerHTML = `<button contenteditable="true">클릭하세요!</button>`;
+                    newElementContainer.style.width = '150px';
+                    newElementContainer.style.height = '60px';
+                    break;
+                case 'list':
+                    droppedContent.innerHTML = `<ul contenteditable="true"><li>첫 번째 항목</li><li>두 번째 항목</li><li>세 번째 항목</li></ul>`;
+                    newElementContainer.style.width = '250px';
+                    newElementContainer.style.height = '120px';
+                    break;
+                case 'input':
+                    droppedContent.innerHTML = `<input type="text" placeholder="텍스트 입력">`;
+                    newElementContainer.style.width = '250px';
+                    newElementContainer.style.height = '60px';
+                    break;
+                case 'textarea':
+                    droppedContent.innerHTML = `<textarea placeholder="여러 줄 텍스트 입력"></textarea>`;
+                    newElementContainer.style.width = '300px';
+                    newElementContainer.style.height = '100px';
+                    break;
+                case 'section':
+                    droppedContent.innerHTML = `<p style="text-align: center; color: #aaa;">섹션/컨테이너 (내용을 드래그하여 채우세요)</p>`;
+                    newElementContainer.style.width = '400px';
+                    newElementContainer.style.height = '200px';
+                    break;
+                case 'divider':
+                    droppedContent.innerHTML = `<hr>`;
+                    newElementContainer.style.width = '300px';
+                    newElementContainer.style.height = '30px';
+                    break;
+                case 'video':
+                    droppedContent.innerHTML = `<div class="video-placeholder">비디오를 넣으세요 (속성창에서 편집)</div>`;
+                    newElementContainer.style.width = '400px';
+                    newElementContainer.style.height = '250px';
+                    break;
+                case 'icon':
+                    droppedContent.innerHTML = `<div class="icon-placeholder" contenteditable="true">⭐</div>`;
+                    newElementContainer.style.width = '80px';
+                    newElementContainer.style.height = '80px';
+                    break;
+                default:
+                    droppedContent.innerHTML = `<p contenteditable="true">알 수 없는 블록</p>`;
+                    newElementContainer.style.width = '200px';
+                    newElementContainer.style.height = '100px';
+            }
+
+            newElementContainer.appendChild(droppedContent);
+
+            // Calculate drop position relative to dropZone
+            const dropZoneRect = dropZone.getBoundingClientRect();
+            let newLeft = e.clientX - dropZoneRect.left - newElementContainer.offsetWidth / 2;
+            let newTop = e.clientY - dropZoneRect.top - newElementContainer.offsetHeight / 2;
+
+            // Constrain within dropZone bounds
+            newLeft = Math.max(0, Math.min(newLeft, dropZoneRect.width - newElementContainer.offsetWidth));
+            newTop = Math.max(0, Math.min(newTop, dropZoneRect.height - newElementContainer.offsetHeight));
+
+            newElementContainer.style.left = `${newLeft}px`;
+            newElementContainer.style.top = `${newTop}px`;
+
+            dropZone.appendChild(newElementContainer);
+
+            // Remove placeholder message if present
+            const placeholderMessage = dropZone.querySelector('.placeholder-message');
+            if (placeholderMessage) {
+                placeholderMessage.remove();
+            }
+
+            addEventListenersToDroppedElement(newElementContainer);
+            selectElement(newElementContainer);
+            updateHiricheyPanel();
+            saveState(); // Save state after adding new element
+        });
+
+        function addEventListenersToDroppedElement(elementContainer) {
+            // Remove existing listeners to prevent duplicates (important for loadState)
+            const oldClick = elementContainer._clickListener;
+            if (oldClick) elementContainer.removeEventListener('click', oldClick);
+            const oldMousedown = elementContainer._mousedownListener;
+            if (oldMousedown) elementContainer.removeEventListener('mousedown', oldMousedown);
+
+            // Click to select
+            const clickListener = (e) => {
+                e.stopPropagation();
+                selectElement(elementContainer);
+            };
+            elementContainer.addEventListener('click', clickListener);
+            elementContainer._clickListener = clickListener; // Store listener reference
+
+            // Mousedown to drag
+            const mousedownListener = (e) => {
+                // Allow dragging unless the click target is an input, textarea, button, or contenteditable
+                if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'BUTTON' || e.target.isContentEditable) {
+                    return;
+                }
+                selectElement(elementContainer);
+                isDraggingElement = true;
+                offsetX = e.clientX - elementContainer.getBoundingClientRect().left;
+                offsetY = e.clientY - elementContainer.getBoundingClientRect().top;
+                elementContainer.style.cursor = 'grabbing';
+            };
+            elementContainer.addEventListener('mousedown', mousedownListener);
+            elementContainer._mousedownListener = mousedownListener; // Store listener reference
+
+            // Add/re-add resize handles
+            const handles = ['top-left', 'top-right', 'bottom-left', 'bottom-right'];
+            handles.forEach(type => {
+                let resizeHandle = elementContainer.querySelector(`.resize-handle.${type}`);
+                if (!resizeHandle) {
+                    resizeHandle = document.createElement('div');
+                    resizeHandle.classList.add('resize-handle', type);
+                    elementContainer.appendChild(resizeHandle);
+                }
+                // Remove old listener before adding new one
+                const oldResizeMousedown = resizeHandle._mousedownListener;
+                if (oldResizeMousedown) resizeHandle.removeEventListener('mousedown', oldResizeMousedown);
+
+                const resizeMousedownListener = (e) => {
+                    e.stopPropagation();
+                    isResizingElement = true;
+                    resizeHandleType = type;
+                    selectedElementContainer = elementContainer; // Ensure it's selected for resize
+                    initialMouseX = e.clientX;
+                    initialMouseY = e.clientY;
+                    initialWidth = selectedElementContainer.offsetWidth;
+                    initialHeight = selectedElementContainer.offsetHeight;
+                    initialLeft = selectedElementContainer.offsetLeft;
+                    initialTop = selectedElementContainer.offsetTop;
+                };
+                resizeHandle.addEventListener('mousedown', resizeMousedownListener);
+                resizeHandle._mousedownListener = resizeMousedownListener; // Store listener reference
+            });
+
+            // Specific event listeners for media and button (not contenteditable)
+            if (elementContainer.dataset.type === 'image') {
+                const imgElement = elementContainer.querySelector('img');
+                const oldImgClick = imgElement._clickListener;
+                if (oldImgClick) imgElement.removeEventListener('click', oldImgClick);
+                const imgClickListener = (e) => {
+                    e.stopPropagation(); // Prevent container selection
+                    selectElement(elementContainer); // Select container when clicking image
+                    // Open Inspector and focus on media controls if possible
+                    inspectorPanel.style.display = 'flex';
+                    // Trigger file input click if it's the image itself
+                    mediaFileInput.click();
+                };
+                imgElement.addEventListener('click', imgClickListener);
+                imgElement._clickListener = imgClickListener;
+            } else if (elementContainer.dataset.type === 'video') {
+                const videoContentElement = elementContainer.querySelector('.dropped-content > div, .dropped-content > video, .dropped-content > iframe');
+                // If it's still a placeholder or actual video element
+                if (videoContentElement) { 
+                    const oldVideoDblClick = videoContentElement._dblClickListener;
+                    if (oldVideoDblClick) videoContentElement.removeEventListener('dblclick', oldVideoDblClick);
+                    const videoDblClickListener = (e) => {
+                        e.stopPropagation(); // Prevent container selection
+                        selectElement(elementContainer); // Select container when clicking video
+                        inspectorPanel.style.display = 'flex'; // Show inspector
+                        // No direct prompt here, user should use inspector
+                    };
+                    videoContentElement.addEventListener('dblclick', videoDblClickListener);
+                    videoContentElement._dblClickListener = videoDblClickListener;
+                }
+            } else if (elementContainer.dataset.type === 'button') {
+                const buttonElement = elementContainer.querySelector('button');
+                const oldButtonDblClick = buttonElement._dblClickListener;
+                if (oldButtonDblClick) buttonElement.removeEventListener('dblclick', oldButtonDblClick);
+                const buttonDblClickListener = (e) => {
+                    e.stopPropagation(); // Prevent container selection
+                    selectElement(elementContainer); // Select container when clicking button
+                    openButtonActionModal(elementContainer);
+                };
+                buttonElement.addEventListener('dblclick', buttonDblClickListener);
+                buttonElement._dblClickListener = buttonDblClickListener;
+            }
+        }
+
+        document.addEventListener('mousemove', (e) => {
+            if (isDraggingElement && selectedElementContainer) {
+                const dropZoneRect = dropZone.getBoundingClientRect();
+                let newLeft = e.clientX - dropZoneRect.left - offsetX;
+                let newTop = e.clientY - dropZoneRect.top - offsetY;
+
+                newLeft = Math.max(0, Math.min(newLeft, dropZoneRect.width - selectedElementContainer.offsetWidth));
+                newTop = Math.max(0, Math.min(newTop, dropZoneRect.height - selectedElementContainer.offsetHeight));
+
+                selectedElementContainer.style.left = `${newLeft}px`;
+                selectedElementContainer.style.top = `${newTop}px`;
+            } else if (isResizingElement && selectedElementContainer) {
+                const dx = e.clientX - initialMouseX;
+                const dy = e.clientY - initialMouseY;
+
+                let newWidth = initialWidth;
+                let newHeight = initialHeight;
+                let newLeft = initialLeft;
+                let newTop = initialTop;
+
+                switch (resizeHandleType) {
+                    case 'bottom-right':
+                        newWidth = initialWidth + dx;
+                        newHeight = initialHeight + dy;
+                        break;
+                    case 'bottom-left':
+                        newWidth = initialWidth - dx;
+                        newHeight = initialHeight + dy;
+                        newLeft = initialLeft + dx;
+                        break;
+                    case 'top-right':
+                        newWidth = initialWidth + dx;
+                        newHeight = initialHeight - dy;
+                        newTop = initialTop + dy;
+                        break;
+                    case 'top-left':
+                        newWidth = initialWidth - dx;
+                        newHeight = initialHeight - dy;
+                        newLeft = initialLeft + dx;
+                        newTop = initialTop + dy;
+                        break;
+                }
+
+                newWidth = Math.max(20, newWidth);
+                newHeight = Math.max(20, newHeight);
+
+                selectedElementContainer.style.width = `${newWidth}px`;
+                selectedElementContainer.style.height = `${newHeight}px`;
+                selectedElementContainer.style.left = `${newLeft}px`;
+                selectedElementContainer.style.top = `${newTop}px`;
+            } else if (isDraggingPanel && currentPanel) {
+                currentPanel.style.left = `${e.clientX - panelOffsetX}px`;
+                currentPanel.style.top = `${e.clientY - panelOffsetY}px`;
+            } else if (isResizingPanel && currentPanel) {
+                const dx = e.clientX - panelInitialMouseX;
+                const dy = e.clientY - panelInitialMouseY;
+
+                let newWidth = panelInitialWidth;
+                let newHeight = panelInitialHeight;
+                let newLeft = panelInitialLeft;
+                let newTop = panelInitialTop;
+
+                switch (panelResizeHandleType) {
+                    case 'bottom-right':
+                        newWidth = panelInitialWidth + dx;
+                        newHeight = panelInitialHeight + dy;
+                        break;
+                    case 'bottom-left':
+                        newWidth = panelInitialWidth - dx;
+                        newHeight = panelInitialHeight + dy;
+                        newLeft = panelInitialLeft + dx;
+                        break;
+                    case 'top-right':
+                        newWidth = panelInitialWidth + dx;
+                        newHeight = panelInitialHeight - dy;
+                        newTop = panelInitialTop + dy;
+                        break;
+                    case 'top-left':
+                        newWidth = panelInitialWidth - dx;
+                        newHeight = panelInitialHeight - dy;
+                        newLeft = panelInitialLeft + dx;
+                        newTop = panelInitialTop + dy;
+                        break;
+                }
+                currentPanel.style.width = `${Math.max(currentPanel.style.minWidth ? parseFloat(currentPanel.style.minWidth) : 150, newWidth)}px`;
+                currentPanel.style.height = `${Math.max(currentPanel.style.minHeight ? parseFloat(currentPanel.style.minHeight) : 100, newHeight)}px`;
+                currentPanel.style.left = `${newLeft}px`;
+                currentPanel.style.top = `${newTop}px`;
+            }
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (isDraggingElement || isResizingElement) {
+                saveState();
+            }
+            isDraggingElement = false;
+            isResizingElement = false;
+            if (selectedElementContainer) {
+                selectedElementContainer.style.cursor = 'grab';
+            }
+
+            isDraggingPanel = false;
+            isResizingPanel = false;
+            currentPanel = null;
+        });
+
+        // --- Element Selection ---
+        function selectElement(elementContainer) {
+            if (selectedElementContainer) {
+                selectedElementContainer.classList.remove('selected');
+                selectedElementContainer.querySelectorAll('.resize-handle').forEach(handle => handle.style.display = 'none');
+            }
+            selectedElementContainer = elementContainer;
+            selectedElementContainer.classList.add('selected');
+            selectedElementContainer.querySelectorAll('.resize-handle').forEach(handle => handle.style.display = 'block');
+            updateHiricheyPanel(); // Update Hirichey list with selection
+            updateInspectorPanel(); // Update Inspector based on selection
+        }
+
+        // Deselect element when clicking outside
+        dropZone.addEventListener('click', (e) => {
+            if (e.target === dropZone && selectedElementContainer) {
+                selectedElementContainer.classList.remove('selected');
+                selectedElementContainer.querySelectorAll('.resize-handle').forEach(handle => handle.style.display = 'none');
+                selectedElementContainer = null;
+                updateHiricheyPanel();
+                updateInspectorPanel();
+            }
+        });
+
+        // --- Keyboard Events (Delete, Undo/Redo) ---
+        document.addEventListener('keydown', (e) => {
+            // Check if focus is NOT on an editable element (input, textarea, contenteditable)
+            const isEditingText = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable;
+
+            if ((e.key === 'Delete' || e.key === 'Backspace') && selectedElementContainer && !isEditingText) {
+                e.preventDefault();
+                saveState(); // Save state before deletion
+                selectedElementContainer.remove();
+                selectedElementContainer = null;
+                updateHiricheyPanel();
+                updateInspectorPanel();
+                saveState(); // Save state after deletion
+                if (dropZone.children.length === 0) {
+                    const p = document.createElement('p');
+                    p.classList.add('placeholder-message');
+                    p.textContent = '여기에 요소를 드래그 앤 드롭해서 웹페이지를 만들어 보세요!';
+                    dropZone.appendChild(p);
+                }
+            } else if (e.ctrlKey || e.metaKey) { // Ctrl or Cmd key
+                if (e.key === 'z') {
+                    e.preventDefault();
+                    if (historyIndex > 0) {
+                        loadState(historyIndex - 1);
+                    }
+                } else if (e.key === 'y') {
+                    e.preventDefault();
+                    if (historyIndex < history.length - 1) {
+                        loadState(historyIndex + 1);
+                    }
+                }
+            }
+        });
+
+        // --- Toolbar Buttons ---
+        clearCanvasBtn.addEventListener('click', () => {
+            if (confirm('정말 모든 요소를 지우시겠어요? 이 작업은 되돌릴 수 없어요!')) {
+                saveState();
+                dropZone.innerHTML = `<p class="placeholder-message">여기에 요소를 드래그 앤 드롭해서 웹페이지를 만들어 보세요!</p>`;
+                selectedElementContainer = null;
+                maxZIndex = 1;
+                updateHiricheyPanel();
+                updateInspectorPanel();
+                saveState();
+            }
+        });
+
+        changeTitleBtn.addEventListener('click', () => {
+            const newTitle = prompt('새로운 웹사이트 제목을 입력하세요:', currentWebsiteTitle);
+            if (newTitle !== null) {
+                saveState(); // Save state before title change
+                currentWebsiteTitle = newTitle;
+                document.title = currentWebsiteTitle;
+                saveState(); // Save state after title change
+            }
+        });
+
+        // --- Hirichey Panel ---
+        function updateHiricheyPanel() {
+            hiricheyList.innerHTML = '';
+            const allElements = Array.from(dropZone.querySelectorAll('.dropped-element-container'));
+            allElements.sort((a, b) => parseInt(b.style.zIndex) - parseInt(a.style.zIndex)); // Sort by z-index descending
+
+            if (allElements.length === 0) {
+                hiricheyPanel.style.display = 'none';
+                return;
+            } else {
+                // 패널에 요소가 있으면 무조건 보이도록 설정
+                hiricheyPanel.style.display = 'flex';
+            }
+
+            allElements.forEach(el => {
+                const hiricheyItem = document.createElement('div');
+                hiricheyItem.classList.add('hirichey-item');
+                if (el === selectedElementContainer) {
+                    hiricheyItem.classList.add('selected');
+                }
+                if (el.style.display === 'none') {
+                    hiricheyItem.classList.add('hidden');
+                }
+                
+                const type = el.dataset.type;
+                let displayName = '';
+                switch(type) {
+                    case 'title': displayName = '제목'; break;
+                    case 'paragraph': displayName = '문단'; break;
+                    case 'image': displayName = '이미지'; break;
+                    case 'button': displayName = '버튼'; break;
+                    case 'list': displayName = '목록'; break;
+                    case 'input': displayName = '텍스트 입력'; break;
+                    case 'textarea': displayName = '여러 줄 입력'; break;
+                    case 'section': displayName = '섹션'; break;
+                    case 'divider': displayName = '구분선'; break;
+                    case 'video': displayName = '비디오'; break;
+                    case 'icon': displayName = '아이콘'; break;
+                    default: displayName = '알 수 없는 요소';
+                }
+
+                hiricheyItem.innerHTML = `<span>${displayName}</span> <span class="z-index-display">(Z:${el.style.zIndex})</span> <span class="visibility-toggle">${el.style.display === 'none' ? '👁️‍🗨️' : '👁️'}</span>`;
+                
+                hiricheyItem.addEventListener('click', () => {
+                    selectElement(el);
+                });
+
+                const visibilityToggle = hiricheyItem.querySelector('.visibility-toggle');
+                visibilityToggle.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    saveState(); // Save state before visibility change
+                    if (el.style.display === 'none') {
+                        el.style.display = '';
+                        visibilityToggle.textContent = '👁️';
+                        visibilityToggle.classList.remove('hidden');
+                    } else {
+                        el.style.display = 'none';
+                        visibilityToggle.textContent = '👁️‍🗨️';
+                        visibilityToggle.classList.add('hidden');
+                    }
+                    saveState(); // Save state after visibility change
+                });
+
+                hiricheyList.appendChild(hiricheyItem);
+            });
+        }
+
+        // --- Inspector Panel ---
+        function updateInspectorPanel() {
+            if (!selectedElementContainer) {
+                noSelectionMessage.style.display = 'block';
+                textControls.style.display = 'none';
+                layerControls.style.display = 'none';
+                mediaControls.style.display = 'none';
+                buttonActionControls.style.display = 'none';
+                inspectorPanel.style.display = 'none'; // Hide inspector if nothing selected
+                return;
+            }
+
+            // 패널에 요소가 선택되면 무조건 보이도록 설정
+            inspectorPanel.style.display = 'flex';
+            noSelectionMessage.style.display = 'none';
+
+            const dataType = selectedElementContainer.dataset.type;
+            const contentElement = selectedElementContainer.querySelector('.dropped-content');
+
+            // Text Controls
+            const isTextElement = ['title', 'paragraph', 'list', 'icon'].includes(dataType);
+            textControls.style.display = isTextElement ? 'block' : 'none';
+            if (isTextElement) {
+                fontSizeSelect.value = contentElement.style.fontSize || '';
+                fontFamilySelect.value = contentElement.style.fontFamily || '';
+            }
+
+            // Layer Controls (Z-index)
+            layerControls.style.display = 'block';
+            zIndexInput.value = selectedElementContainer.style.zIndex;
+
+            // Media Controls
+            const isMediaElement = ['image', 'video'].includes(dataType);
+            mediaControls.style.display = isMediaElement ? 'block' : 'none';
+            if (isMediaElement) {
+                mediaFileInput.style.display = 'none';
+                mediaUrlInput.style.display = 'none';
+                mediaReplaceBtn.style.display = 'block';
+
+                if (dataType === 'image') {
+                    mediaLabel.textContent = '이미지 교체:';
+                    mediaFileInput.style.display = 'block';
+                    mediaFileInput.accept = 'image/*';
+                } else if (dataType === 'video') {
+                    mediaLabel.textContent = '비디오 URL/임베드:';
+                    mediaUrlInput.style.display = 'block';
+                    // Populate current video URL/embed if available
+                    const videoContent = contentElement.innerHTML;
+                    if (videoContent.includes('<video')) {
+                        mediaUrlInput.value = contentElement.querySelector('source') ? contentElement.querySelector('source').src : '';
+                    } else if (videoContent.includes('<iframe')) {
+                        mediaUrlInput.value = videoContent; // Save full iframe HTML
+                    } else {
+                        mediaUrlInput.value = '';
+                    }
+                }
+            }
+
+            // Button Action Controls
+            const isButtonElement = dataType === 'button';
+            buttonActionControls.style.display = isButtonElement ? 'block' : 'none';
+        }
+
+        // --- Inspector Controls Event Listeners ---
+        fontSizeSelect.addEventListener('change', (e) => {
+            if (selectedElementContainer) {
+                saveState();
+                selectedElementContainer.querySelector('.dropped-content').style.fontSize = e.target.value;
+                saveState();
+            }
+        });
+
+        fontFamilySelect.addEventListener('change', (e) => {
+            if (selectedElementContainer) {
+                saveState();
+                selectedElementContainer.querySelector('.dropped-content').style.fontFamily = e.target.value;
+                saveState();
+            }
+        });
+
+        zIndexInput.addEventListener('change', (e) => {
+            if (selectedElementContainer) {
+                let newZIndex = parseInt(e.target.value);
+                if (isNaN(newZIndex) || newZIndex < 1) {
+                    newZIndex = 1;
+                }
+                saveState();
+                selectedElementContainer.style.zIndex = newZIndex;
+                maxZIndex = Math.max(maxZIndex, newZIndex);
+                updateHiricheyPanel();
+                saveState();
+            }
+        });
+        zIndexUpBtn.addEventListener('click', () => {
+            if (selectedElementContainer) {
+                saveState();
+                let currentZ = parseInt(selectedElementContainer.style.zIndex) || 1;
+                selectedElementContainer.style.zIndex = currentZ + 1;
+                maxZIndex = Math.max(maxZIndex, currentZ + 1);
+                zIndexInput.value = selectedElementContainer.style.zIndex;
+                updateHiricheyPanel();
+                saveState();
+            }
+        });
+        zIndexDownBtn.addEventListener('click', () => {
+            if (selectedElementContainer) {
+                saveState();
+                let currentZ = parseInt(selectedElementContainer.style.zIndex) || 1;
+                selectedElementContainer.style.zIndex = Math.max(1, currentZ - 1);
+                zIndexInput.value = selectedElementContainer.style.zIndex;
+                updateHiricheyPanel();
+                saveState();
+            }
+        });
+
+        mediaReplaceBtn.addEventListener('click', () => {
+            if (!selectedElementContainer) return;
+            const dataType = selectedElementContainer.dataset.type;
+            const contentElement = selectedElementContainer.querySelector('.dropped-content');
+            saveState(); // Save state before media change
+
+            if (dataType === 'image') {
+                mediaFileInput.click(); // Trigger file input click
+            } else if (dataType === 'video') {
+                const newVideoSrc = mediaUrlInput.value;
+                if (newVideoSrc) {
+                    if (newVideoSrc.includes('<iframe')) {
+                        contentElement.innerHTML = newVideoSrc;
+                    } else if (newVideoSrc.includes('<video')) { // If user pastes a <video> tag
+                        contentElement.innerHTML = newVideoSrc;
+                    } else { // Assume it's a URL
+                        contentElement.innerHTML = `<video controls style="width:100%; height:100%; object-fit: cover;"><source src="${newVideoSrc}"></video>`;
+                    }
+                }
+            }
+            saveState(); // Save state after media change
+        });
+
+        mediaFileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file && selectedElementContainer && selectedElementContainer.dataset.type === 'image') {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    saveState(); // Save state before image change
+                    selectedElementContainer.querySelector('img').src = e.target.result;
+                    saveState(); // Save state after image change
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        openButtonActionModalBtn.addEventListener('click', () => {
+            if (selectedElementContainer && selectedElementContainer.dataset.type === 'button') {
+                openButtonActionModal(selectedElementContainer);
+            }
+        });
+
+        // --- Panel Dragging & Resizing Logic ---
+        function makePanelDraggableAndResizable(panel) {
+            const header = panel.querySelector('.panel-header');
+            const closeBtn = panel.querySelector('.close-btn');
+
+            // Dragging
+            header.addEventListener('mousedown', (e) => {
+                if (e.target === closeBtn) return; // Don't drag if clicking close button
+                isDraggingPanel = true;
+                currentPanel = panel;
+                panelOffsetX = e.clientX - panel.getBoundingClientRect().left;
+                panelOffsetY = e.clientY - panel.getBoundingClientRect().top;
+                panel.style.cursor = 'grabbing';
+            });
+
+            // Resizing handles
+            const panelHandles = ['top-left', 'top-right', 'bottom-left', 'bottom-right'];
+            panelHandles.forEach(type => {
+                let resizeHandle = document.createElement('div');
+                resizeHandle.classList.add('resize-handle', type); // Using same styles
+                panel.appendChild(resizeHandle);
+
+                resizeHandle.addEventListener('mousedown', (e) => {
+                    e.stopPropagation(); // Prevent panel drag from starting
+                    isResizingPanel = true;
+                    currentPanel = panel;
+                    panelResizeHandleType = type;
+                    panelInitialMouseX = e.clientX;
+                    panelInitialMouseY = e.clientY;
+                    panelInitialWidth = panel.offsetWidth;
+                    panelInitialHeight = panel.offsetHeight;
+                    panelInitialLeft = panel.offsetLeft;
+                    panelInitialTop = panel.offsetTop;
+                });
+            });
+
+            // Close button
+            closeBtn.addEventListener('click', () => {
+                panel.style.display = 'none';
+            });
+        }
+
+        makePanelDraggableAndResizable(hiricheyPanel);
+        makePanelDraggableAndResizable(inspectorPanel);
+
+        // --- Button Action Modal ---
+        // Variable declared once globally at the top of the script
+        // let currentButtonElementInModal = null; // Already declared at line ~100
+
+        function openButtonActionModal(buttonContainer) {
+            currentButtonElementInModal = buttonContainer; // Assign to the globally declared variable
+            const actionType = buttonContainer.dataset.actionType || 'none';
+            const actionValue = buttonContainer.dataset.actionValue || '';
+
+            actionTypeSelect.value = actionType;
+            linkUrlInput.value = actionValue;
+
+            if (actionType === 'link') {
+                linkInputGroup.style.display = 'block';
+            } else {
+                linkInputGroup.style.display = 'none';
+            }
+
+            buttonActionModal.style.display = 'flex';
+        }
+
+        function closeButtonActionModal() {
+            buttonActionModal.style.display = 'none';
+            currentButtonElementInModal = null;
+        }
+
+        actionTypeSelect.addEventListener('change', () => {
+            if (actionTypeSelect.value === 'link') {
+                linkInputGroup.style.display = 'block';
+            } else {
+                linkInputGroup.style.display = 'none';
+            }
+        });
+
+        actionSaveBtn.addEventListener('click', () => {
+            if (currentButtonElementInModal) { // Use the globally declared variable
+                saveState(); // Save state before button action change
+                const selectedActionType = actionTypeSelect.value;
+                currentButtonElementInModal.dataset.actionType = selectedActionType; // Use the globally declared variable
+
+                if (selectedActionType === 'link') {
+                    currentButtonElementInModal.dataset.actionValue = linkUrlInput.value; // Use the globally declared variable
+                } else {
+                    delete currentButtonElementInModal.dataset.actionValue; // Use the globally declared variable
+                }
+                saveState(); // Save state after button action change
+            }
+            closeButtonActionModal();
+        });
+
+        actionCancelBtn.addEventListener('click', () => {
+            closeButtonActionModal();
+        });
+
+        // --- Play Button (Preview) ---
+        playBtn.addEventListener('click', () => {
+            previewWebsite();
+        });
+        
+        function previewWebsite() {
+            const elements = dropZone.querySelectorAll('.dropped-element-container');
+            let contentHTML = '';
+
+            elements.forEach(el => {
+                if (el.style.display === 'none') return; // Hidden elements are not included
+
+                const computedStyle = window.getComputedStyle(el);
+                const inlineStyle = `position: absolute;` +
+                                    `left: ${computedStyle.left};` +
+                                    `top: ${computedStyle.top};` +
+                                    `width: ${computedStyle.width};` +
+                                    `height: ${computedStyle.height};` +
+                                    `z-index: ${computedStyle.zIndex};`;
+                
+                let innerHtml = el.querySelector('.dropped-content').innerHTML;
+                innerHtml = innerHtml.replace(/contenteditable="true"/g, '');
+
+                const contentElement = el.querySelector('.dropped-content');
+                const textStyle = `font-size: ${contentElement.style.fontSize || 'initial'}; font-family: ${contentElement.style.fontFamily || 'initial'};`;
+                
+                if (el.dataset.type === 'button' && el.dataset.actionType === 'link' && el.dataset.actionValue) {
+                    const buttonText = el.querySelector('button').textContent;
+                    innerHtml = `<a href="${el.dataset.actionValue}" target="_blank" style="text-decoration: none;"><button>${buttonText}</button></a>`;
+                }
+
+                let additionalContentStyle = '';
+                if (el.dataset.type === 'section') {
+                    additionalContentStyle += `background-color: #f0f4f7; border: 1px dashed #c0d0e0; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 0.9em; color: #aaa;`;
+                } else if (el.dataset.type === 'divider') {
+                    additionalContentStyle += `display: flex; align-items: center; justify-content: center;`;
+                } else if (el.dataset.type === 'image' || el.dataset.type === 'video' || el.dataset.type === 'icon') {
+                    additionalContentStyle += `display: flex; align-items: center; justify-content: center;`;
+                } else if (el.dataset.type === 'title' || el.dataset.type === 'paragraph' || el.dataset.type === 'list') {
+                    additionalContentStyle += `display: block;`;
+                }
+
+                contentHTML += `<div style="${inlineStyle}"><div style="width:100%; height:100%; box-sizing:border-box; ${textStyle} ${additionalContentStyle}">${innerHtml}</div></div>\n`;
+            });
+
+            const previewHTML = `
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${currentWebsiteTitle}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=Open+Sans&family=Roboto&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            margin: 0;
+            overflow: auto;
+            background-color: #ffffff;
+            min-height: 100vh;
+            position: relative;
+        }
+        /* Common styles for elements */
+        h1 { font-size: 2.5em; margin: 0; padding: 0; line-height: 1.2; color: #333; } /* 색상 통일 */
+        p { font-size: 1em; margin: 0; padding: 0; line-height: 1.6; color: #333; } /* 색상 통일 */
+        ul { list-style: disc; padding-left: 20px; margin: 0; }
+        li { font-size: 1em; margin-bottom: 5px; color: #333; } /* 색상 통일 */
+        img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; border-radius: 5px; }
+        button { background-color: #4caf50; color: white; padding: 8px 15px; border: none; border-radius: 5px; cursor: pointer; font-size: 0.9em; transition: background-color 0.2s ease; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+        button:hover { background-color: #43a047; }
+        input[type="text"], textarea { width: 100%; height: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 0.9em; box-sizing: border-box; }
+        hr { width: 100%; border: none; border-top: 2px solid #ccc; margin: 0; }
+        .video-placeholder video, .video-placeholder iframe { width: 100%; height: 100%; object-fit: cover; border-radius: 5px; }
+        .icon-placeholder { font-size: 3em; text-align: center; color: #ffc107; display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; }
+
+        /* --- 반응형 디자인을 위한 미디어 쿼리 예시 --- */
+        /* 화면 너비가 768px 이하일 때 적용 */
+        @media screen and (max-width: 768px) {
+            /* 예시: 모든 h1 태그의 글씨 크기를 작게 조절 */
+            h1 {
+                font-size: 1.8em;
+            }
+            /* 예시: 모든 p 태그의 글씨 크기를 약간 작게 조절 */
+            p {
+                font-size: 0.9em;
+            }
+            /* 예시: 버튼의 패딩을 조절하여 더 작게 보이도록 */
+            button {
+                padding: 6px 12px;
+                font-size: 0.8em;
+            }
+            /*
+            참고: 현재 요소들은 절대 위치(position: absolute)로 배치되어 있어
+            화면 크기에 따라 자동으로 재배치되지는 않습니다.
+            요소의 위치를 유동적으로 만들려면 'left', 'top', 'width', 'height' 등을
+            '%' 값으로 변경하거나, Flexbox/Grid 같은 레이아웃 시스템을 사용해야 합니다.
+            이 부분은 생성된 코드에서 수동으로 수정하거나,
+            향후 빌더 기능 개선을 통해 자동화될 수 있습니다.
+            */
+        }
+    </style>
+</head>
+<body>
+    ${contentHTML}
+</body>
+</html>
+            `;
+
+            const newWindow = window.open('', '_blank');
+            if (newWindow) {
+                newWindow.document.write(previewHTML);
+                newWindow.document.close();
+            } else {
+                alert('팝업이 차단되었습니다. 팝업 차단을 해제해주세요.');
+            }
+        }
+
+        // --- Copy Code Button ---
+        copyCodeBtn.addEventListener('click', () => {
+            copyWebsiteCode();
+        });
+
+        async function copyWebsiteCode() {
+            const elements = dropZone.querySelectorAll('.dropped-element-container');
+            let contentHTML = '';
+
+            elements.forEach(el => {
+                if (el.style.display === 'none') return; // Hidden elements are not included
+
+                const computedStyle = window.getComputedStyle(el);
+                const inlineStyle = `position: absolute;` +
+                                    `left: ${computedStyle.left};` +
+                                    `top: ${computedStyle.top};` +
+                                    `width: ${computedStyle.width};` +
+                                    `height: ${computedStyle.height};` +
+                                    `z-index: ${computedStyle.zIndex};`;
+                
+                let innerHtml = el.querySelector('.dropped-content').innerHTML;
+                innerHtml = innerHtml.replace(/contenteditable="true"/g, ''); // Remove contenteditable attribute
+
+                const contentElement = el.querySelector('.dropped-content');
+                const textStyle = `font-size: ${contentElement.style.fontSize || 'initial'}; font-family: ${contentElement.style.fontFamily || 'initial'};`;
+
+                if (el.dataset.type === 'button' && el.dataset.actionType === 'link' && el.dataset.actionValue) {
+                    const buttonText = el.querySelector('button').textContent;
+                    innerHtml = `<a href="${el.dataset.actionValue}" target="_blank" style="text-decoration: none;"><button>${buttonText}</button></a>`;
+                }
+
+                let additionalContentStyle = '';
+                if (el.dataset.type === 'section') {
+                    additionalContentStyle += `background-color: #f0f4f7; border: 1px dashed #c0d0e0; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 0.9em; color: #aaa;`;
+                } else if (el.dataset.type === 'divider') {
+                    additionalContentStyle += `display: flex; align-items: center; justify-content: center;`;
+                } else if (el.dataset.type === 'image' || el.dataset.type === 'video' || el.dataset.type === 'icon') {
+                    additionalContentStyle += `display: flex; align-items: center; justify-content: center;`;
+                } else if (el.dataset.type === 'title' || el.dataset.type === 'paragraph' || el.dataset.type === 'list') {
+                    additionalContentStyle += `display: block;`;
+                }
+                
+                contentHTML += `<div style="${inlineStyle}"><div style="width:100%; height:100%; box-sizing:border-box; ${textStyle} ${additionalContentStyle}">${innerHtml}</div></div>\n`;
+            });
+
+            const fullCode = `
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${currentWebsiteTitle}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=Open+Sans&family=Roboto&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            margin: 0;
+            overflow: auto;
+            background-color: #ffffff;
+            min-height: 100vh;
+            position: relative;
+        }
+        /* Common styles for elements */
+        h1 { font-size: 2.5em; margin: 0; padding: 0; line-height: 1.2; color: #333; } /* 색상 통일 */
+        p { font-size: 1em; margin: 0; padding: 0; line-height: 1.6; color: #333; } /* 색상 통일 */
+        ul { list-style: disc; padding-left: 20px; margin: 0; }
+        li { font-size: 1em; margin-bottom: 5px; color: #333; } /* 색상 통일 */
+        img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; border-radius: 5px; }
+        button { background-color: #4caf50; color: white; padding: 8px 15px; border: none; border-radius: 5px; cursor: pointer; font-size: 0.9em; transition: background-color 0.2s ease; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+        button:hover { background-color: #43a047; }
+        input[type="text"], textarea { width: 100%; height: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 0.9em; box-sizing: border-box; }
+        hr { width: 100%; border: none; border-top: 2px solid #ccc; margin: 0; }
+        .video-placeholder video, .video-placeholder iframe { width: 100%; height: 100%; object-fit: cover; border-radius: 5px; }
+        .icon-placeholder { font-size: 3em; text-align: center; color: #ffc107; display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; }
+
+        /* --- 반응형 디자인을 위한 미디어 쿼리 예시 --- */
+        /* 화면 너비가 768px 이하일 때 적용 */
+        @media screen and (max-width: 768px) {
+            /* 예시: 모든 h1 태그의 글씨 크기를 작게 조절 */
+            h1 {
+                font-size: 1.8em;
+            }
+            /* 예시: 모든 p 태그의 글씨 크기를 약간 작게 조절 */
+            p {
+                font-size: 0.9em;
+            }
+            /* 예시: 버튼의 패딩을 조절하여 더 작게 보이도록 */
+            button {
+                padding: 6px 12px;
+                font-size: 0.8em;
+            }
+            /*
+            참고: 현재 요소들은 절대 위치(position: absolute)로 배치되어 있어
+            화면 크기에 따라 자동으로 재배치되지는 않습니다.
+            요소의 위치를 유동적으로 만들려면 'left', 'top', 'width', 'height' 등을
+            '%' 값으로 변경하거나, Flexbox/Grid 같은 레이아웃 시스템을 사용해야 합니다.
+            이 부분은 생성된 코드에서 수동으로 수정하거나,
+            향후 빌더 기능 개선을 통해 자동화될 수 있습니다.
+            */
+        }
+    </style>
+</head>
+<body>
+    ${contentHTML}
+</body>
+</html>
+            `;
+
+            try {
+                await navigator.clipboard.writeText(fullCode);
+                alert('HTML 코드가 클립보드에 복사되었습니다! 🎉');
+            } catch (err) {
+                console.error('클립보드 복사 실패:', err);
+                alert('죄송해요, 코드 복사에 실패했어요. 브라우저에서 클립보드 접근을 허용했는지 확인해주세요. 😢');
+            }
+        }
+
+        // --- Initial Setup ---
+        saveState(); // Save initial empty canvas state
+        updateHiricheyPanel();
+        updateInspectorPanel(); // Initial call to hide/show and set up
+
+        // Re-attach listeners for elements loaded from history (if any)
+        dropZone.querySelectorAll('.dropped-element-container').forEach(addEventListenersToDroppedElement);
+    </script>
+</body>
+</html>
